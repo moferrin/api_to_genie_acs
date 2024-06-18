@@ -35,37 +35,7 @@ router.post("/obtenerDatosReinicio", async (req, res) => {
     const dispositivo = await DispositivoModel.findOne({ _id: id });
     console.log("dispositivo:",dispositivo);
     res.json(dispositivo);
-
-    // res.json({
-    //     wifi: "Hola Mundo2",
-    //     password: 'CLAVE PEPE',
-    //     puertos : [
-    //         {
-    //             puerto: '8083',
-    //             internoExterno : '8083:8083',
-    //             nombre: 'Router1',
-    //             ip: '192.168.100.2'
-    //         },
-    //         {
-    //             puerto: '8084',
-    //             internoExterno : '8084:8084',
-    //             nombre: 'Router2',
-    //             ip: '192.168.100.3'
-    //         },
-    //         {
-    //             puerto: '8085',
-    //             internoExterno : '8085:8085',
-    //             nombre: 'Router3',
-    //             ip: '192.168.100.4'
-    //         },
-    //         {
-    //             puerto: '8086',
-    //             internoExterno : '8086:8086',
-    //             nombre: 'Router4',
-    //             ip: '192.168.100.5'
-    //         }
-    //     ]
-    // });
+    
 });
 
 router.post("/cambiarWifi", async (req, res) => {
