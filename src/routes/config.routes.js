@@ -26,7 +26,7 @@ const DispositivoModel = mongoose.model('Dispositivo', {
 
 }, 'equipos');
 
-const serverIP = 'http://localhost:7557'
+const serverIP = 'http://192.168.210.7:7557'
 
 router.post("/obtenerDatosReinicio", async (req, res) => {
     console.log(req.body);
@@ -80,7 +80,6 @@ router.post("/cambiarWifi", async (req, res) => {
         name: 'setParameterValues',
         parameterValues: [
           ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID', wifi.ssid, 'xsd:string'],
-          ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.PreSharedKey', wifi.password, 'xsd:string'],
           ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase', wifi.password, 'xsd:string']
         ]
     };
