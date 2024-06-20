@@ -26,11 +26,107 @@ const DispositivoModel = mongoose.model('Dispositivo', {
 
 }, 'equipos');
 
-const serverIP = 'http://192.168.210.7:7557'
+const serverIP = 'http://192.168.210.7:7557';
+
+const regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+
+
+router.get("/listar", async (req, res) => {
+
+    const url = `${serverIP}/devices`;
+    const response = await axios.get(url);
+
+    const devices = response.data.map(device => {
+        // Inicializar WANDevice como null
+        let _WANDevice = null;
+        // Buscar en WANConnectionDevice desde '1' hasta '8'
+        for (let i = 1; i <= 8; i++) {
+            // Verificar si el objeto y la propiedad deseada existen
+            if (device.InternetGatewayDevice.WANDevice['1'].WANConnectionDevice[i] &&
+                device.InternetGatewayDevice.WANDevice['1'].WANConnectionDevice[i].WANIPConnection['1'] &&
+                device.InternetGatewayDevice.WANDevice['1'].WANConnectionDevice[i].WANIPConnection['1'].ExternalIPAddress['_value']) {
+                // Asignar el valor de ExternalIPAddress a WANDevice
+                _WANDevice = device.InternetGatewayDevice.WANDevice['1'].WANConnectionDevice[i].WANIPConnection['1'].ExternalIPAddress['_value'];
+                // Salir del bucle una vez que se encuentra el dato
+                break;
+            }
+        }
+        // Devolver el objeto con la propiedad WANDevice solo si se encontró un valor
+        return {
+            _id: device._id,
+            _Manufacturer: device._deviceId._Manufacturer,
+            _WANDevice, // Esto será null si no se encontró ningún valor
+            _ProductClass: device._deviceId._ProductClass,
+            _SerialNumber: device._deviceId._SerialNumber,
+        };
+    });
+
+    return res.json(devices);
+});
+
+router.post("/listarById", async (req, res) => {
+
+    const id = req.body.id;
+    //validar que exista el campo
+    if (!id) {
+        return res.status(400).json({
+            message: "Debe enviar el id del dispositivo"
+        });
+    }
+
+    const url = `${serverIP}/devices/?query={"_id": "${id}"}`;
+    const response = await axios.get(url);
+
+    const devices = response.data.map(device => {
+        // Inicializar WANDevice como null
+        let _WANDevice = null;
+        // Buscar en WANConnectionDevice desde '1' hasta '8'
+        for (let i = 1; i <= 8; i++) {
+            // Verificar si el objeto y la propiedad deseada existen
+            if (device.InternetGatewayDevice.WANDevice['1'].WANConnectionDevice[i] &&
+                device.InternetGatewayDevice.WANDevice['1'].WANConnectionDevice[i].WANIPConnection['1'] &&
+                device.InternetGatewayDevice.WANDevice['1'].WANConnectionDevice[i].WANIPConnection['1'].ExternalIPAddress['_value']) {
+                // Asignar el valor de ExternalIPAddress a WANDevice
+                _WANDevice = device.InternetGatewayDevice.WANDevice['1'].WANConnectionDevice[i].WANIPConnection['1'].ExternalIPAddress['_value'];
+                // Salir del bucle una vez que se encuentra el dato
+                break;
+            }
+        }
+        // Devolver el objeto con la propiedad WANDevice solo si se encontró un valor
+        return {
+            _id: device._id,
+            _Manufacturer: device._deviceId._Manufacturer,
+            _WANDevice, // Esto será null si no se encontró ningún valor
+            _ProductClass: device._deviceId._ProductClass,
+            _SerialNumber: device._deviceId._SerialNumber,
+        };
+    });
+
+    return res.json(devices);
+});
+
+router.post("/obtenerDatosPanel", async (req, res) => {
+    const id = req.body.id;
+    //validar que exista el campo
+    if (!id) {
+        return res.status(400).json({
+            message: "Debe enviar el id del dispositivo"
+        });
+    }
+    const dispositivo = await DispositivoModel.findOne({ _id: id });
+    console.log("dispositivo:",dispositivo);
+    res.json(dispositivo);
+    
+});
 
 router.post("/obtenerDatosReinicio", async (req, res) => {
-    console.log(req.body);
     const id = req.body.id;
+    if (!id) {
+        return res.status(400).json({
+            message: "Debe enviar el id del dispositivo"
+        });
+    }
+    console.log('Reinicio de:' + id);
 
     const dispositivo = await DispositivoModel.findOne({ _id: id });
     console.log("dispositivo:",dispositivo);
@@ -42,7 +138,34 @@ router.post("/cambiarWifi", async (req, res) => {
     console.log(req.body);
     const id = req.body.id;
     const wifi = req.body.wifi;
- ;
+
+    if (!id) {
+        return res.status(400).json({
+            message: "Debe enviar el id del dispositivo"
+        });
+    }
+
+    if (!wifi) {
+        return res.status(400).json({
+            message: "Debe enviar datos wifi del dispositivo"
+        });
+    }
+
+    //validar campo ssid, y password
+    if (!wifi.ssid ||!wifi.password) {
+        return res.status(400).json({
+            message: "Debe enviar el id del dispositivo"
+        });
+    }
+
+    const dispositivo = await DispositivoModel.findOne({ _id: id });
+    console.log("dispositivo:",dispositivo);
+
+    if (!dispositivo) {
+        return res.status(400).json({
+            message: "Dispositivo no encontrado"
+        });
+    }
 
     const url = `${serverIP}/devices/${id}/tasks?connection_request`;
 
@@ -67,7 +190,6 @@ router.post("/cambiarWifi", async (req, res) => {
         console.error(error);
         res.status(500).json({message:"Error al realizar la solicitud"});
     });
-
 });
 
 router.post("/cambiarMapeoPuertos", async (req, res) => {
@@ -75,6 +197,12 @@ router.post("/cambiarMapeoPuertos", async (req, res) => {
     const id = req.body.id;
     const puertos = req.body.puertos;
 
+
+    let validacion = validarPuertos(puertos);
+    if(validacion){
+        return res.status(400).json(validacion);
+    }
+    
     const url = `${serverIP}/devices/${id}/tasks?connection_request`;
 
     //borrado de puertos
@@ -82,7 +210,17 @@ router.post("/cambiarMapeoPuertos", async (req, res) => {
         name: 'deleteObject',
         objectName:'InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.PortMapping.*'
     };
-    await axios.post(url, data);
+    await axios.post(url, data)
+    .then(async response => {
+        //console.log('Respuesta del servidor:');
+        //console.log(response.data)
+    })
+    .catch(err => {
+        console.error('Error al realizar la solicitud:');
+        console.error(err);
+        return res.status(500).json({message:"Error al realizar la solicitud"});
+    });
+
     console.log("Borrado de puertos OK");
 
     //creacion de puertos
@@ -138,7 +276,48 @@ router.post("/cambiarMapeoPuertos", async (req, res) => {
 router.post("/cambiarLan", async (req, res) => {
     console.log(req.body);
     const id = req.body.id;
-    const lan = req.body.lan;
+    let lan = req.body.lan;
+
+    if (!id) {
+        return res.status(400).json({
+            message: "Debe enviar el id del dispositivo"
+        });
+    }
+    if (!lan) {
+        return res.status(400).json({
+            message: "Debe enviar datos lan del dispositivo"
+        });
+    }
+
+    lan = {
+        mascara: lan.mascara.trim(),
+        ipMin: lan.ipMin.trim(),
+        ipMax: lan.ipMax.trim(),
+        dns: lan.dns.trim(),
+    }
+
+    //verificar que mascara, ipMin, ipMax sean tipo ip y no otro tipo de dato
+    if (!regex.test(lan.mascara) ||!regex.test(lan.ipMin) ||!regex.test(lan.ipMax)) {
+        return res.status(400).json({
+            message: "Valide que sus datos sean correctos"
+        });
+    }
+
+    let dns = lan.dns.split(',');
+    if (dns.length > 2) {
+        return res.status(400).json({
+            message: "Máximo 2 dns"
+        });
+    }
+
+    for (let i = 0; i < dns.length; i++) {
+        if (!regex.test(dns[i]).trim()) {
+            return res.status(400).json({
+                message: "Valide que sus datos sean correctos"
+            });
+        }
+    }
+
 
     const url = `${serverIP}/devices/${id}/tasks?connection_request`;
 
@@ -166,5 +345,61 @@ router.post("/cambiarLan", async (req, res) => {
         res.status(500).json({message:"Error al realizar la solicitud"});
     });
 });
+
+router.post("/guardarDatos", async (req, res) => {
+    console.log(req.body);
+    const id = req.body.id;
+    console.log('Guardar:'+ id)
+
+    //mandar a guardar en la base de datos si no existe
+    const dispositivo = new DispositivoModel({
+        _id: req.body.id,
+        wifi: req.body.wifi,
+        puertos: req.body.puertos,
+        lan: req.body.lan
+    });
+
+    await DispositivoModel.findOneAndUpdate({_id: id},dispositivo,{new: true, upsert: true});
+
+    res.json({message: "Datos guardados correctamente"});   
+});
+
+function validarPuertos (puertos) {
+    for (let i = 0; i < puertos.length; i++){
+        let element = puertos[i];
+        //validar el campo interno y externo sean numeros
+        if (!element.interno ||!element.externo) {
+            return {
+                message: "Ingrese los puertos internos y externos"
+            };
+        }
+
+        if (isNaN(element.interno) || isNaN(element.externo)) {
+            return {
+                message: "Ingrese los puertos internos y externos como numeros"
+            };
+        }    
+        //validar ipHost
+        if (!element.ipHost) {
+            return {
+                message: "Ingrese la ip del host"
+            };
+        }
+
+        element.ipHost = element.ipHost.trim();
+        if (!regex.test(element.ipHost)) {
+            return {
+                message: "Ingrese una ip valida"
+            };
+        }
+
+        //validar nombre
+        if (!element.nombre) {
+            return {
+                message: "Ingrese descripcion (Nombre)"
+            };
+        }
+    };
+}
 
 export default router;
