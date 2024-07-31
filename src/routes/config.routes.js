@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { authRequired } from '../middlewares/validateToken.js';
+
 const router = Router();
 const mongoose = require('mongoose');
 const axios = require('axios');
@@ -110,14 +112,16 @@ router.post("/listarById", async (req, res) => {
     return res.json(devices);
 });
 
-router.get("/listarByUser/:cedulaRUC", async (req, res) => {
+router.get("/listarByUser/:cedulaRUC", authRequired, async (req, res) => {
     const cedulaRUC = req.params.cedulaRUC;
+    console.log(req.user);
     //validar que exista el campo
     if (!cedulaRUC) {
         return res.status(400).json({
             message: "Debe enviar cedula o ruc"
         });
     }
+    console.log(cedulaRUC);
     const dispositivo = await DispositivoModel.find({ cedulaRUC });
     res.json(dispositivo);
 });
@@ -423,8 +427,6 @@ router.put('/asociar', async (req, res) => {
     await DispositivoModel.findOneAndUpdate({puertoPON},{cedulaRUC},{ new: true, upsert: true });
     res.json({message: "Dispositivo asociado correctamente"});
 })
-
-
 
 function validarPuertos (puertos) {
     for (let i = 0; i < puertos.length; i++){
