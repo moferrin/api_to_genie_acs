@@ -311,7 +311,8 @@ router.post("/cambiarLan", async (req, res) => {
     }
 
     for (let i = 0; i < dns.length; i++) {
-        if (!regex.test(dns[i]).trim()) {
+        dns[i] = dns[i].trim();
+        if (!regex.test(dns[i])) {
             return res.status(400).json({
                 message: "Valide que sus datos sean correctos"
             });
@@ -362,6 +363,27 @@ router.post("/guardarDatos", async (req, res) => {
     await DispositivoModel.findOneAndUpdate({_id: id},dispositivo,{new: true, upsert: true});
 
     res.json({message: "Datos guardados correctamente"});   
+});
+
+router.post("/eliminar", async (req, res) => {
+    console.log(req.body);
+    const id = req.body.id;
+    console.log('Eliminar:'+ id)
+
+    const url = `${serverIP}/devices/${id}`;
+
+    await axios.delete(url)
+    .then(async response => {
+        console.log('Respuesta del servidor:');
+        console.log(response.data);
+        await DispositivoModel.findByIdAndDelete({_id: id});
+        res.json({message: "Dispositivo eliminado correctamente"});
+    })
+    .catch(error => {
+        console.error('Error al realizar la solicitud:');
+        console.error(error);
+        res.status(500).json({message:"Error al realizar la solicitud"});
+    });
 });
 
 function validarPuertos (puertos) {
