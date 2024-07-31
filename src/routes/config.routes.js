@@ -5,6 +5,11 @@ const axios = require('axios');
 
 const DispositivoModel = mongoose.model('Dispositivo', {
     _id:String,
+    puertoPON: String,
+    marca:String,
+    modelo:String,
+    ipWAN:String,
+    cedulaRUC: String,
     wifi:{
         ssid: {
             required:false,
@@ -103,6 +108,18 @@ router.post("/listarById", async (req, res) => {
     });
 
     return res.json(devices);
+});
+
+router.get("/listarByUser/:cedulaRUC", async (req, res) => {
+    const cedulaRUC = req.params.cedulaRUC;
+    //validar que exista el campo
+    if (!cedulaRUC) {
+        return res.status(400).json({
+            message: "Debe enviar cedula o ruc"
+        });
+    }
+    const dispositivo = await DispositivoModel.find({ cedulaRUC });
+    res.json(dispositivo);
 });
 
 router.post("/obtenerDatosPanel", async (req, res) => {
@@ -357,7 +374,11 @@ router.post("/guardarDatos", async (req, res) => {
         _id: req.body.id,
         wifi: req.body.wifi,
         puertos: req.body.puertos,
-        lan: req.body.lan
+        lan: req.body.lan,
+        puertoPON: req.body.puertoPON,
+        marca: req.body.marca,
+        modelo: req.body.modelo,
+        ipWAN: req.body.ipWAN
     });
 
     await DispositivoModel.findOneAndUpdate({_id: id},dispositivo,{new: true, upsert: true});
@@ -385,6 +406,25 @@ router.post("/eliminar", async (req, res) => {
         res.status(500).json({message:"Error al realizar la solicitud"});
     });
 });
+
+router.put('/asociar', async (req, res) => {
+    const {cedulaRUC, puertoPON} = req.body;
+    if (!cedulaRUC) {
+        return res.status(400).json({
+            message: "Debe enviar la cedula o ruc"
+        });
+    }
+    if(!puertoPON){
+        return res.status(400).json({
+            message: "Debe enviar el puerto pon"
+        });
+    }
+    //mandar a actualizar en mongo
+    await DispositivoModel.findOneAndUpdate({puertoPON},{cedulaRUC},{ new: true, upsert: true });
+    res.json({message: "Dispositivo asociado correctamente"});
+})
+
+
 
 function validarPuertos (puertos) {
     for (let i = 0; i < puertos.length; i++){
