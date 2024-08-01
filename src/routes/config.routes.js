@@ -11,7 +11,10 @@ const DispositivoModel = mongoose.model('Dispositivo', {
     marca:String,
     modelo:String,
     ipWAN:String,
-    cedulaRUC: String,
+    cedulaRUC: {
+        type:String,
+        default: ''
+    },
     wifi:{
         ssid: {
             required:false,
@@ -45,7 +48,7 @@ router.get("/listar", async (req, res) => {
 
     const devices = response.data.map(device => {
         // Inicializar WANDevice como null
-        let _WANDevice = null;
+        let ipWAN = null;
         // Buscar en WANConnectionDevice desde '1' hasta '8'
         for (let i = 1; i <= 8; i++) {
             // Verificar si el objeto y la propiedad deseada existen
@@ -53,7 +56,7 @@ router.get("/listar", async (req, res) => {
                 device.InternetGatewayDevice.WANDevice['1'].WANConnectionDevice[i].WANIPConnection['1'] &&
                 device.InternetGatewayDevice.WANDevice['1'].WANConnectionDevice[i].WANIPConnection['1'].ExternalIPAddress['_value']) {
                 // Asignar el valor de ExternalIPAddress a WANDevice
-                _WANDevice = device.InternetGatewayDevice.WANDevice['1'].WANConnectionDevice[i].WANIPConnection['1'].ExternalIPAddress['_value'];
+                ipWAN = device.InternetGatewayDevice.WANDevice['1'].WANConnectionDevice[i].WANIPConnection['1'].ExternalIPAddress['_value'];
                 // Salir del bucle una vez que se encuentra el dato
                 break;
             }
@@ -61,10 +64,10 @@ router.get("/listar", async (req, res) => {
         // Devolver el objeto con la propiedad WANDevice solo si se encontró un valor
         return {
             _id: device._id,
-            _Manufacturer: device._deviceId._Manufacturer,
-            _WANDevice, // Esto será null si no se encontró ningún valor
-            _ProductClass: device._deviceId._ProductClass,
-            _SerialNumber: device._deviceId._SerialNumber,
+            marca: device._deviceId._Manufacturer,
+            ipWAN, // Esto será null si no se encontró ningún valor
+            modelo: device._deviceId._ProductClass,
+            puertoPON: device._deviceId._SerialNumber,
         };
     });
 
@@ -112,17 +115,22 @@ router.post("/listarById", async (req, res) => {
     return res.json(devices);
 });
 
-router.get("/listarByUser/:cedulaRUC", authRequired, async (req, res) => {
-    const cedulaRUC = req.params.cedulaRUC;
-    console.log(req.user);
+router.get("/listarByUser",authRequired, async (req, res) => {
+    let cedulaRUC = req.cedulaRUC;
+    console.log(cedulaRUC)
     //validar que exista el campo
     if (!cedulaRUC) {
         return res.status(400).json({
             message: "Debe enviar cedula o ruc"
         });
     }
-    console.log(cedulaRUC);
-    const dispositivo = await DispositivoModel.find({ cedulaRUC });
+    let dispositivo = {};
+    // console.log(req.rol)
+    if(req.rol == '1')
+        dispositivo = await DispositivoModel.find(); 
+    else
+        { console.log("perro"); dispositivo = await DispositivoModel.find({cedulaRUC});}
+
     res.json(dispositivo);
 });
 
@@ -426,6 +434,41 @@ router.put('/asociar', async (req, res) => {
     //mandar a actualizar en mongo
     await DispositivoModel.findOneAndUpdate({puertoPON},{cedulaRUC},{ new: true, upsert: true });
     res.json({message: "Dispositivo asociado correctamente"});
+})
+
+router.get('/test', async (req, res) => {
+    const url = `${serverIP}/devices/00259E-EG8120L-4857544389A6399B/tasks?connection_request`;
+
+    let data = {
+        name: 'addObject',
+        objectName:'Tags.Provisioned',
+    }
+    await axios.post(url, data).then(async response => {
+        console.log('Respuesta del servidor:');
+        console.log(response.data);
+        //actualizar en mongo
+        //res.json({message: "actualizada correctamente"});
+    })
+
+    data = {
+        name: 'setParameterValues',
+        parameterValues: [
+          ['Tags.Provisioned', "2300720578", 'xsd:string']
+        ]
+    };
+
+    await axios.post(url, data)
+    .then(async response => {
+        console.log('Respuesta del servidor:');
+        console.log(response.data);
+        //actualizar en mongo
+        res.json({message: "actualizada correctamente"});
+    })
+    .catch(error => {
+        console.error('Error al realizar la solicitud:');
+        console.error(error);
+        res.status(500).json({message:"Error al realizar la solicitud"});
+    });
 })
 
 function validarPuertos (puertos) {

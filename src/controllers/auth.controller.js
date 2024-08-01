@@ -1,7 +1,7 @@
 import User from '../models/user.model.js'
 import bcrypt from 'bcryptjs'
 import { createAccessToken } from '../libs/jwt.js'
-import { TOKEN_SECRET_KEY } from '../config.js'
+import config from '../config'
 import jwt from 'jsonwebtoken'
 import axios from 'axios'
 
@@ -70,10 +70,10 @@ export const profile = async (req, res) => {
     })
 }
 export const verifyToken = async (req, res) => {
-    const { token } = req.cookies;
+    const { token } = req.cookies;    
     if (!token) return res.send(false);
 
-    jwt.verify(token, TOKEN_SECRET_KEY, async (error, user) => {
+    jwt.verify(token, config.TOKEN_SECRET_KEY, async (error, user) => {
         if (error) return res.sendStatus(401);
 
         const userFound = await User.findById(user.id);
