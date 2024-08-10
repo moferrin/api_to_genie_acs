@@ -5,41 +5,48 @@ const router = Router();
 const mongoose = require('mongoose');
 const axios = require('axios');
 
-const DispositivoModel = mongoose.model('Dispositivo', {
-    _id:String,
+const DispositivoSchema = new mongoose.Schema({
+    _id: String,
     puertoPON: String,
-    marca:String,
-    modelo:String,
-    ipWAN:String,
+    marca: String,
+    modelo: String,
+    ipWAN: String,
     cedulaRUC: {
-        type:String,
+        type: String,
         default: ''
     },
-    wifi:{
+    wifi: {
         ssid: {
-            required:false,
-            type: String
-            },
+            type: String,
+            required: false
+        },
         password: {
-            required:false,
-            type: String
-            },
+            type: String,
+            required: false
+        },
+        enabled: {
+            type: Boolean,
+            required: false
+        }
     },
-    puertos : {
-        required:false,
-        type: Array
+    puertos: {
+        type: Array,
+        required: false
     },
-    lan:{
-        required:false,
-        type: Object
+    lan: {
+        type: Object,
+        required: false
     }
+}, {
+    timestamps: true,
+    collection: 'equipos' // nombre de la colección en MongoDB
+});
 
-}, 'equipos');
+const DispositivoModel = mongoose.model('Dispositivo', DispositivoSchema);
 
 const serverIP = 'http://192.168.210.7:7557';
 
 const regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-
 
 router.get("/listar", async (req, res) => {
 
@@ -115,7 +122,7 @@ router.post("/listarById", async (req, res) => {
     return res.json(devices);
 });
 
-router.get("/listarByUser",authRequired, async (req, res) => {
+router.get("/listarByUser", authRequired, async (req, res) => {
     let cedulaRUC = req.cedulaRUC;
     console.log(cedulaRUC)
     //validar que exista el campo
@@ -126,10 +133,10 @@ router.get("/listarByUser",authRequired, async (req, res) => {
     }
     let dispositivo = {};
     // console.log(req.rol)
-    if(req.rol == '1')
-        dispositivo = await DispositivoModel.find(); 
+    if(req.isAdmin == true)
+        dispositivo = await DispositivoModel.find();
     else
-        { console.log("perro"); dispositivo = await DispositivoModel.find({cedulaRUC});}
+        dispositivo = await DispositivoModel.find({cedulaRUC});
 
     res.json(dispositivo);
 });
@@ -145,7 +152,7 @@ router.post("/obtenerDatosPanel", async (req, res) => {
     const dispositivo = await DispositivoModel.findOne({ _id: id });
     console.log("dispositivo:",dispositivo);
     res.json(dispositivo);
-    
+
 });
 
 router.post("/obtenerDatosReinicio", async (req, res) => {
@@ -160,7 +167,7 @@ router.post("/obtenerDatosReinicio", async (req, res) => {
     const dispositivo = await DispositivoModel.findOne({ _id: id });
     console.log("dispositivo:",dispositivo);
     res.json(dispositivo);
-    
+
 });
 
 router.post("/cambiarWifi", async (req, res) => {
@@ -181,9 +188,9 @@ router.post("/cambiarWifi", async (req, res) => {
     }
 
     //validar campo ssid, y password
-    if (!wifi.ssid ||!wifi.password) {
+    if ((!wifi.ssid ||!wifi.password) && (wifi.enabled == true)) {
         return res.status(400).json({
-            message: "Debe enviar el id del dispositivo"
+            message: "Enviar credentiales"
         });
     }
 
@@ -231,7 +238,7 @@ router.post("/cambiarMapeoPuertos", async (req, res) => {
     if(validacion){
         return res.status(400).json(validacion);
     }
-    
+
     const url = `${serverIP}/devices/${id}/tasks?connection_request`;
 
     //borrado de puertos
@@ -319,6 +326,7 @@ router.post("/cambiarLan", async (req, res) => {
     }
 
     lan = {
+        ipLAN: lan.ipLAN.trim(),
         mascara: lan.mascara.trim(),
         ipMin: lan.ipMin.trim(),
         ipMax: lan.ipMax.trim(),
@@ -359,7 +367,7 @@ router.post("/cambiarLan", async (req, res) => {
             [`InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.MaxAddress`, lan.ipMax, "xsd:string"],
             [`InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.DNSServers`, lan.dns, "xsd:string"]
         ]
-    } 
+    }
 
     await axios.post(url, data)
     .then(async response => {
@@ -379,7 +387,27 @@ router.post("/cambiarLan", async (req, res) => {
 router.post("/guardarDatos", async (req, res) => {
     console.log(req.body);
     const id = req.body.id;
-    console.log('Guardar:'+ id)
+
+    let cedulaRUC = "2300720576";
+    const form = new FormData();
+    form.append('puertoPON', req.body.puertoPON);
+
+
+    // await axios.post('https://power.net.ec/app/rest_powernet/web-services/get_user_portpon.php',{
+//     firstName: 'Fred',
+//     lastName: 'Flintstone'
+//   }).then(async response => {
+    //     console.log('Respuesta del servidor:');
+    //     console.log(response.data);
+    //     //actualizar en mongo
+    //     cedulaRUC = "2300720576"
+    // })
+    // .catch(error => {
+    //     console.error('Error al realizar la solicitud:');
+    //     ///console.error(error);
+    //     cedulaRUC = "23007205760001"
+    // });
+
 
     //mandar a guardar en la base de datos si no existe
     const dispositivo = new DispositivoModel({
@@ -390,12 +418,13 @@ router.post("/guardarDatos", async (req, res) => {
         puertoPON: req.body.puertoPON,
         marca: req.body.marca,
         modelo: req.body.modelo,
-        ipWAN: req.body.ipWAN
+        ipWAN: req.body.ipWAN,
+        cedulaRUC: cedulaRUC
     });
 
-    await DispositivoModel.findOneAndUpdate({_id: id},dispositivo,{new: true, upsert: true});
+    await DispositivoModel.findOneAndUpdate({_id: id},{ $set: dispositivo },{new: true, upsert: true});
 
-    res.json({message: "Datos guardados correctamente"});   
+    res.json({message: "Datos guardados correctamente"});
 });
 
 router.post("/eliminar", async (req, res) => {
@@ -436,38 +465,47 @@ router.put('/asociar', async (req, res) => {
     res.json({message: "Dispositivo asociado correctamente"});
 })
 
-router.get('/test', async (req, res) => {
-    const url = `${serverIP}/devices/00259E-EG8120L-4857544389A6399B/tasks?connection_request`;
-
-    let data = {
-        name: 'addObject',
-        objectName:'Tags.Provisioned',
+router.post('/resetear', async (req, res) => {
+    const {id} = req.body;
+    if (!id) {
+        return res.status(400).json({
+            message: "Debe enviar el id del dispositivo"
+        });
     }
-    await axios.post(url, data).then(async response => {
-        console.log('Respuesta del servidor:');
-        console.log(response.data);
-        //actualizar en mongo
-        //res.json({message: "actualizada correctamente"});
-    })
+    const url = `${serverIP}/devices/${id}/tasks?connection_request`;
 
-    data = {
-        name: 'setParameterValues',
-        parameterValues: [
-          ['Tags.Provisioned', "2300720578", 'xsd:string']
-        ]
-    };
+    const data = {
+        name:"factoryReset"
+    }
 
     await axios.post(url, data)
     .then(async response => {
         console.log('Respuesta del servidor:');
         console.log(response.data);
         //actualizar en mongo
-        res.json({message: "actualizada correctamente"});
+        res.json({message: "Reseteado correctamente"});
     })
     .catch(error => {
         console.error('Error al realizar la solicitud:');
         console.error(error);
         res.status(500).json({message:"Error al realizar la solicitud"});
+    });
+})
+
+router.get('/test', async (req, res) => {
+    let cedulaRUC
+    await axios.post('https://power.net.ec/app/rest_powernet/web-services/get_user_portpon.php',{
+        port_pon: '4857544389A6399B'
+    }).then(async response => {
+        console.log('Respuesta del servidor:');
+        console.log(response.data);
+        //actualizar en mongo
+        cedulaRUC = "2300720576"
+    })
+    .catch(error => {
+        console.error('Error al realizar la solicitud:');
+        ///console.error(error);
+        cedulaRUC = "23007205760001"
     });
 })
 
@@ -485,7 +523,7 @@ function validarPuertos (puertos) {
             return {
                 message: "Ingrese los puertos internos y externos como numeros"
             };
-        }    
+        }
         //validar ipHost
         if (!element.ipHost) {
             return {

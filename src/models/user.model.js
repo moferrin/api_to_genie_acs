@@ -1,11 +1,10 @@
 import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema({
-    username: {type: String, required: true, trim: true},
-    email: {type: String, required: true, trim: true, unique: true},
+    names: {type: String, required: true, trim: true},
+    cedulaRUC: {type: String, required: true, trim: true, unique: true},
     password: {type: String, required: true, trim: true},
-    rol: {type: String, required: true, trim: true},
-    cedulaRUC: {type: String, required: true, trim: true},
+    isAdmin: {type: 'boolean', required: true, trim: true}
     //devices: [{ type: String, required: true, trim: true }]
 }, {
     timestamps: true,
