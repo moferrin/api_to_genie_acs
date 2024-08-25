@@ -203,14 +203,28 @@ router.post("/cambiarWifi", async (req, res) => {
         });
     }
 
-    const url = `${serverIP}/devices/${id}/tasks?connection_request`;
+    const url = `${serverIP}/devices/${id}/tasks?timeout=3000&connection_request`;
+
+    let parameterValues = [];
+
+    parameterValues.push(['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Enable', wifi.enabled, 'xsd:boolean']);
+    parameterValues.push(['InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.Enable', wifi.enabled, 'xsd:boolean']);
+
+    //si tiene wifi activado, puedo mandar a poner ssid
+    if(wifi.enabled){
+        parameterValues.push(['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID', wifi.ssid, 'xsd:string']);
+        parameterValues.push(['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase', wifi.password, 'xsd:string']);
+
+        //si tiene 5G
+        if(true){
+            parameterValues.push(['InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSID', wifi.ssid+" 5G", 'xsd:string']);
+            parameterValues.push(['InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PreSharedKey.1.KeyPassphrase', wifi.password, 'xsd:string']);      
+        }
+    }
 
     const data = {
         name: 'setParameterValues',
-        parameterValues: [
-          ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID', wifi.ssid, 'xsd:string'],
-          ['InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase', wifi.password, 'xsd:string']
-        ]
+        parameterValues: parameterValues
     };
 
     await axios.post(url, data)
@@ -233,13 +247,12 @@ router.post("/cambiarMapeoPuertos", async (req, res) => {
     const id = req.body.id;
     const puertos = req.body.puertos;
 
-
     let validacion = validarPuertos(puertos);
     if(validacion){
         return res.status(400).json(validacion);
     }
 
-    const url = `${serverIP}/devices/${id}/tasks?connection_request`;
+    const url = `${serverIP}/devices/${id}/tasks?timeout=3000&connection_request`;
 
     //borrado de puertos
     let data = {
@@ -357,11 +370,12 @@ router.post("/cambiarLan", async (req, res) => {
     }
 
 
-    const url = `${serverIP}/devices/${id}/tasks?connection_request`;
+    const url = `${serverIP}/devices/${id}/tasks?timeout=3000&connection_request`;
 
     const data = {
         name:"setParameterValues",
         parameterValues:[
+            [`InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPInterface.1.IPInterfaceIPAddress`, lan.ipLAN, "xsd:string"],
             [`InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPInterface.1.IPInterfaceSubnetMask`, lan.mascara, "xsd:string"],
             [`InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.MinAddress`, lan.ipMin, "xsd:string"],
             [`InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.MaxAddress`, lan.ipMax, "xsd:string"],
@@ -387,27 +401,38 @@ router.post("/cambiarLan", async (req, res) => {
 router.post("/guardarDatos", async (req, res) => {
     console.log(req.body);
     const id = req.body.id;
+    const puertoPON = req.body.puertoPON;
+
+    
 
     let cedulaRUC = "2300720576";
-    const form = new FormData();
-    form.append('puertoPON', req.body.puertoPON);
 
+    await axios.post('https://power.net.ec/app/rest_powernet/web-services/get_user_portpon.php',
+        {
+            port_pon: puertoPON
+        },
+        {
+            headers: {
+                'Authorization': 'Bearer 0baa30c656b407c1bda1270dca777eed'  // Aquí se añade el token Bearer
+            }
+        }
+    ).then(async response => {
+        console.log('Respuesta del servidor:');
+        let respuesta  = response.data;
 
-    // await axios.post('https://power.net.ec/app/rest_powernet/web-services/get_user_portpon.php',{
-//     firstName: 'Fred',
-//     lastName: 'Flintstone'
-//   }).then(async response => {
-    //     console.log('Respuesta del servidor:');
-    //     console.log(response.data);
-    //     //actualizar en mongo
-    //     cedulaRUC = "2300720576"
-    // })
-    // .catch(error => {
-    //     console.error('Error al realizar la solicitud:');
-    //     ///console.error(error);
-    //     cedulaRUC = "23007205760001"
-    // });
+        console.log(respuesta);
+        console.log(respuesta.data);
 
+        if(respuesta.success == 'OK'){
+            cedulaRUC = respuesta.data.user_ci;
+        } else {
+            console.error('Error al obtener cedula RUC para: ' + puertoPON);
+        }
+    })
+    .catch(error => {
+        console.log(error);
+        console.error('Error al realizar la solicitud para:' + puertoPON);
+    });
 
     //mandar a guardar en la base de datos si no existe
     const dispositivo = new DispositivoModel({
@@ -472,7 +497,7 @@ router.post('/resetear', async (req, res) => {
             message: "Debe enviar el id del dispositivo"
         });
     }
-    const url = `${serverIP}/devices/${id}/tasks?connection_request`;
+    const url = `${serverIP}/devices/${id}/tasks?timeout=3000&connection_request`;
 
     const data = {
         name:"factoryReset"
@@ -482,7 +507,6 @@ router.post('/resetear', async (req, res) => {
     .then(async response => {
         console.log('Respuesta del servidor:');
         console.log(response.data);
-        //actualizar en mongo
         res.json({message: "Reseteado correctamente"});
     })
     .catch(error => {
@@ -492,22 +516,22 @@ router.post('/resetear', async (req, res) => {
     });
 })
 
-router.get('/test', async (req, res) => {
-    let cedulaRUC
-    await axios.post('https://power.net.ec/app/rest_powernet/web-services/get_user_portpon.php',{
-        port_pon: '4857544389A6399B'
-    }).then(async response => {
-        console.log('Respuesta del servidor:');
-        console.log(response.data);
-        //actualizar en mongo
-        cedulaRUC = "2300720576"
-    })
-    .catch(error => {
-        console.error('Error al realizar la solicitud:');
-        ///console.error(error);
-        cedulaRUC = "23007205760001"
-    });
-})
+// router.get('/test', async (req, res) => {
+//     let cedulaRUC
+//     await axios.post('https://power.net.ec/app/rest_powernet/web-services/get_user_portpon.php',{
+//         port_pon: '4857544389A6399B'
+//     }).then(async response => {
+//         console.log('Respuesta del servidor:');
+//         console.log(response.data);
+//         //actualizar en mongo
+//         cedulaRUC = "2300720576"
+//     })
+//     .catch(error => {
+//         console.error('Error al realizar la solicitud:');
+//         ///console.error(error);
+//         cedulaRUC = "23007205760001"
+//     });
+// })
 
 function validarPuertos (puertos) {
     for (let i = 0; i < puertos.length; i++){
